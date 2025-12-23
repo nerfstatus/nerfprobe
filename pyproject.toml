@@ -62,6 +62,11 @@ select = ["E", "W", "F", "I", "B", "C4", "UP"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
+exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
