@@ -1,32 +1,31 @@
 """Probe runner - orchestrates probe execution."""
 
-from typing import Sequence
+from collections.abc import Sequence
 
-from nerfprobe_core import ModelTarget, ProbeResult, LLMGateway
+from nerfprobe_core import LLMGateway, ModelTarget, ProbeResult
 from nerfprobe_core.probes import (
-    CORE_PROBES,
     ADVANCED_PROBES,
-    OPTIONAL_PROBES,
     ALL_PROBES,
+    CORE_PROBES,
+    OPTIONAL_PROBES,
     PROBE_REGISTRY,
 )
 from nerfprobe_core.probes.config import (
+    CalibrationProbeConfig,
+    ChainOfThoughtProbeConfig,
+    CodeProbeConfig,
+    ConstraintProbeConfig,
+    ContextProbeConfig,
+    FingerprintProbeConfig,
+    LogicPuzzleProbeConfig,
     MathProbeConfig,
+    MultilingualProbeConfig,
+    RepetitionProbeConfig,
+    RoutingProbeConfig,
     StyleProbeConfig,
     TimingProbeConfig,
-    CodeProbeConfig,
-    FingerprintProbeConfig,
-    ContextProbeConfig,
-    RoutingProbeConfig,
-    RepetitionProbeConfig,
-    ConstraintProbeConfig,
-    LogicPuzzleProbeConfig,
-    ChainOfThoughtProbeConfig,
-    CalibrationProbeConfig,
     ZeroPrintProbeConfig,
-    MultilingualProbeConfig,
 )
-
 
 # Default probe configurations
 DEFAULT_CONFIGS = {
@@ -98,9 +97,7 @@ async def run_probe(
 ) -> ProbeResult:
     """Run a single probe."""
     if probe_name not in PROBE_REGISTRY:
-        raise ValueError(
-            f"Unknown probe: {probe_name}. Available: {list(PROBE_REGISTRY.keys())}"
-        )
+        raise ValueError(f"Unknown probe: {probe_name}. Available: {list(PROBE_REGISTRY.keys())}")
 
     target = ModelTarget(
         provider_id=provider_id,
@@ -166,6 +163,7 @@ async def run_probes(
         except Exception as e:
             # Create a failed result for exceptions
             from nerfprobe_core import ProbeType
+
             results.append(
                 ProbeResult(
                     probe_name=probe_name,

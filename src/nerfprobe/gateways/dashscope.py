@@ -1,9 +1,9 @@
 """Alibaba DashScope gateway for Qwen models."""
 
-from typing import AsyncIterator
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult
+import httpx
+from nerfprobe_core import LogprobResult, ModelTarget
 
 
 class DashScopeGateway:
@@ -49,9 +49,7 @@ class DashScopeGateway:
         data = response.json()
         return data.get("output", {}).get("text", "")
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming completion."""
         client = await self._get_client()
         async with client.stream(
@@ -69,6 +67,7 @@ class DashScopeGateway:
                 if line.startswith("data:"):
                     try:
                         import json
+
                         data = json.loads(line[5:])
                         text = data.get("output", {}).get("text", "")
                         if text:

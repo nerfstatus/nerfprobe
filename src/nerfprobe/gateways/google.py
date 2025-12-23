@@ -1,9 +1,9 @@
 """Google Gemini gateway."""
 
-from typing import AsyncIterator
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult
+import httpx
+from nerfprobe_core import LogprobResult, ModelTarget
 
 
 class GoogleGateway:
@@ -52,9 +52,7 @@ class GoogleGateway:
             return "".join(text_parts)
         return ""
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming completion for timing analysis."""
         client = await self._get_client()
         async with client.stream(
@@ -71,6 +69,7 @@ class GoogleGateway:
                     data_str = line[6:]
                     try:
                         import json
+
                         data = json.loads(data_str)
                         candidates = data.get("candidates", [])
                         if candidates:

@@ -1,9 +1,9 @@
 """Anthropic Claude gateway."""
 
-from typing import AsyncIterator
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult
+import httpx
+from nerfprobe_core import LogprobResult, ModelTarget
 
 
 class AnthropicGateway:
@@ -55,9 +55,7 @@ class AnthropicGateway:
         text_parts = [block["text"] for block in content if block["type"] == "text"]
         return "".join(text_parts)
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming completion for timing analysis."""
         client = await self._get_client()
         async with client.stream(
@@ -76,6 +74,7 @@ class AnthropicGateway:
                     data_str = line[6:]
                     try:
                         import json
+
                         data = json.loads(data_str)
                         if data.get("type") == "content_block_delta":
                             delta = data.get("delta", {})

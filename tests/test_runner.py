@@ -1,15 +1,15 @@
 """Tests for runner module."""
 
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
 from nerfprobe.runner import (
+    DEFAULT_CONFIGS,
+    get_probes_for_tier,
     run_probe,
     run_probes,
-    get_probes_for_tier,
-    DEFAULT_CONFIGS,
 )
-from nerfprobe_core import ModelTarget
 
 
 @pytest.fixture
@@ -52,8 +52,7 @@ class TestDefaultConfigs:
             assert probe_name in DEFAULT_CONFIGS
 
     def test_all_advanced_probes_have_configs(self):
-        for probe_name in ["fingerprint", "context", "routing", "repetition", 
-                          "constraint", "logic", "cot"]:
+        for probe_name in ["fingerprint", "context", "routing", "repetition", "constraint", "logic", "cot"]:
             assert probe_name in DEFAULT_CONFIGS
 
     def test_all_optional_probes_have_configs(self):
@@ -78,18 +77,19 @@ class TestRunProbes:
     @pytest.mark.asyncio
     async def test_run_core_tier(self, mock_gateway):
         mock_gateway.generate.return_value = "Test response 252"
-        
+
         # Mock streaming for timing probe
         async def mock_stream(*args):
             yield "token"
+
         mock_gateway.generate_stream = mock_stream
-        
+
         results = await run_probes(
             model_name="test-model",
             gateway=mock_gateway,
             tier="core",
         )
-        
+
         assert len(results) == 4
         probe_names = [r.probe_name for r in results]
         assert "math_probe" in probe_names
@@ -97,25 +97,25 @@ class TestRunProbes:
     @pytest.mark.asyncio
     async def test_run_specific_probes(self, mock_gateway):
         mock_gateway.generate.return_value = "The answer is 252."
-        
+
         results = await run_probes(
             model_name="test-model",
             gateway=mock_gateway,
             probes=["math"],
         )
-        
+
         assert len(results) == 1
         assert results[0].probe_name == "math_probe"
 
     @pytest.mark.asyncio
     async def test_handle_probe_error(self, mock_gateway):
         mock_gateway.generate.side_effect = Exception("API Error")
-        
+
         results = await run_probes(
             model_name="test-model",
             gateway=mock_gateway,
             probes=["math"],
         )
-        
+
         assert len(results) == 1
         assert results[0].passed is False

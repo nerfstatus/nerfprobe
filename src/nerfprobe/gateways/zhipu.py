@@ -1,9 +1,9 @@
 """Zhipu AI gateway for GLM models."""
 
-from typing import AsyncIterator
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult
+import httpx
+from nerfprobe_core import LogprobResult, ModelTarget
 
 
 class ZhipuGateway:
@@ -48,9 +48,7 @@ class ZhipuGateway:
         data = response.json()
         return data["choices"][0]["message"]["content"]
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming completion."""
         client = await self._get_client()
         async with client.stream(
@@ -70,6 +68,7 @@ class ZhipuGateway:
                         break
                     try:
                         import json
+
                         data = json.loads(data_str)
                         delta = data["choices"][0].get("delta", {})
                         content = delta.get("content", "")

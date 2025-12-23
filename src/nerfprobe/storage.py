@@ -4,10 +4,10 @@ import json
 import statistics
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
-from platformdirs import user_data_dir
 from nerfprobe_core import ProbeResult
+from platformdirs import user_data_dir
 
 APP_NAME = "nerfprobe"
 APP_AUTHOR = "nerfstatus"
@@ -23,69 +23,69 @@ def get_data_dir() -> Path:
 class ResultStore:
     """Stores probe results in a JSONL file."""
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Path | None = None):
         self.data_dir = path or get_data_dir()
         self.results_file = self.data_dir / "results.jsonl"
 
     def append(self, result: ProbeResult):
         """Append a result to the store."""
         with open(self.results_file, "a", encoding="utf-8") as f:
-            # Add timestamp only if not present (ProbeResult usually has it, 
+            # Add timestamp only if not present (ProbeResult usually has it,
             # but we ensure we are storing a complete record)
             data = result.model_dump(mode="json")
-            if "timestamp" not in data: # Should be in metadata if anywhere, or we add wrap
+            if "timestamp" not in data:  # Should be in metadata if anywhere, or we add wrap
                 data["stored_at"] = datetime.now().isoformat()
-            
+
             f.write(json.dumps(data) + "\n")
 
     def get_recent(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get recent results."""
         if not self.results_file.exists():
             return []
-        
-        # Simple implementation: read all, return last N. 
+
+        # Simple implementation: read all, return last N.
         # For huge files, we'd want reverse reading.
         lines = []
         try:
-            with open(self.results_file, "r", encoding="utf-8") as f:
+            with open(self.results_file, encoding="utf-8") as f:
                 lines = f.readlines()
         except FileNotFoundError:
             return []
-            
+
         return [json.loads(line) for line in lines[-limit:]][::-1]
 
     def get_trends(self, model: str, limit: int = 100) -> dict[str, list[tuple[str, float]]]:
         """Get score trends for a model by probe."""
         if not self.results_file.exists():
             return {}
-            
+
         trends: dict[str, list[tuple[str, float]]] = {}
-        
-        with open(self.results_file, "r", encoding="utf-8") as f:
+
+        with open(self.results_file, encoding="utf-8") as f:
             for line in f:
                 try:
                     data = json.loads(line)
                     if data.get("target", {}).get("model_name") != model:
                         continue
-                        
+
                     probe = data.get("probe_name")
                     score = data.get("score")
-                    timestamp = data.get("stored_at") or datetime.now().isoformat() # Fallback
-                    
+                    timestamp = data.get("stored_at") or datetime.now().isoformat()  # Fallback
+
                     if probe and score is not None:
                         if probe not in trends:
                             trends[probe] = []
                         trends[probe].append((timestamp, float(score)))
                 except json.JSONDecodeError:
                     continue
-                    
+
         return trends
 
 
 class BaselineStore:
     """Stores baseline scores for models."""
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Path | None = None):
         self.data_dir = path or get_data_dir()
         self.baseline_file = self.data_dir / "baselines.json"
 
@@ -93,7 +93,7 @@ class BaselineStore:
         if not self.baseline_file.exists():
             return {}
         try:
-            with open(self.baseline_file, "r", encoding="utf-8") as f:
+            with open(self.baseline_file, encoding="utf-8") as f:
                 return json.load(f)
         except json.JSONDecodeError:
             return {}
@@ -107,25 +107,25 @@ class BaselineStore:
         baselines = self._load()
         if model not in baselines:
             baselines[model] = {}
-        
+
         # Group by probe
         grouped: dict[str, list[float]] = {}
         for r in results:
             if r.probe_name not in grouped:
                 grouped[r.probe_name] = []
             grouped[r.probe_name].append(r.score)
-            
+
         # Average
         for probe, scores in grouped.items():
             baselines[model][probe] = {
                 "score": statistics.mean(scores),
                 "samples": len(scores),
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat(),
             }
-            
+
         self._save(baselines)
 
-    def get_baseline_score(self, model: str, probe_name: str) -> Optional[float]:
+    def get_baseline_score(self, model: str, probe_name: str) -> float | None:
         """Get baseline score for a specific probe."""
         baselines = self._load()
         return baselines.get(model, {}).get(probe_name, {}).get("score")

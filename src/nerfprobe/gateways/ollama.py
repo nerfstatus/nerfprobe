@@ -1,9 +1,9 @@
 """Ollama gateway for local models."""
 
-from typing import AsyncIterator
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult
+import httpx
+from nerfprobe_core import LogprobResult, ModelTarget
 
 
 class OllamaGateway:
@@ -45,9 +45,7 @@ class OllamaGateway:
         data = response.json()
         return data.get("response", "")
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming completion for timing analysis."""
         client = await self._get_client()
         async with client.stream(
@@ -64,6 +62,7 @@ class OllamaGateway:
                 if line:
                     try:
                         import json
+
                         data = json.loads(line)
                         text = data.get("response", "")
                         if text:

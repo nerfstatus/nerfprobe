@@ -3,25 +3,24 @@
 import asyncio
 import json
 import os
-from typing import Optional
-
 from datetime import datetime
 from pathlib import Path
 
 import typer
-from rich.console import Console
-from rich.table import Table
 from crontab import CronTab
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.table import Table
 
 # Load environment variables (supports .env in CWD or ~/.nerfprobe/.env)
 load_dotenv()
 load_dotenv(Path.home() / ".nerfprobe" / ".env")
 
-from nerfprobe.gateways import OpenAIGateway, AnthropicGateway, GoogleGateway
-from nerfprobe.runner import run_probes, get_probes_for_tier
-from nerfprobe.storage import ResultStore, BaselineStore
-from nerfprobe_core.probes import PROBE_REGISTRY, CORE_PROBES, ADVANCED_PROBES, OPTIONAL_PROBES
+from nerfprobe_core.probes import ADVANCED_PROBES, CORE_PROBES, OPTIONAL_PROBES, PROBE_REGISTRY
+
+from nerfprobe.gateways import AnthropicGateway, GoogleGateway, OpenAIGateway
+from nerfprobe.runner import get_probes_for_tier, run_probes
+from nerfprobe.storage import BaselineStore, ResultStore
 
 app = typer.Typer(
     name="nerfprobe",
@@ -40,8 +39,8 @@ console = Console()
 
 def get_gateway(
     provider: str,
-    api_key: Optional[str],
-    base_url: Optional[str],
+    api_key: str | None,
+    base_url: str | None,
 ):
     """Create the appropriate gateway based on provider."""
     if provider == "openai" or base_url:
@@ -69,20 +68,24 @@ def get_gateway(
             base_url=base_url or "https://api.openai.com/v1",
         )
 
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+
 from rich import box
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 # ... (imports)
+
 
 @app.command()
 def run(
     model: str = typer.Argument(..., help="Model to test (e.g., gpt-4o, claude-3-opus)"),
     tier: str = typer.Option("core", "--tier", "-t", help="Probe tier: core, advanced, optional, all"),
-    probe: Optional[list[str]] = typer.Option(None, "--probe", "-p", help="Specific probes to run"),
+    probe: list[str] | None = typer.Option(None, "--probe", "-p", help="Specific probes to run"),
     provider: str = typer.Option("openai", "--provider", help="Provider: openai, anthropic, google, openrouter"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", "-k", help="API key (or use env var)"),
-    base_url: Optional[str] = typer.Option(None, "--base-url", "-u", help="Custom base URL for OpenAI-compatible endpoints"),
+    api_key: str | None = typer.Option(None, "--api-key", "-k", help="API key (or use env var)"),
+    base_url: str | None = typer.Option(
+        None, "--base-url", "-u", help="Custom base URL for OpenAI-compatible endpoints"
+    ),
     format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, markdown"),
 ):
     """Run probes on an LLM model."""
@@ -91,8 +94,9 @@ def run(
     console.print(f"[dim]Target: {model} ({provider})[/dim]\n")
 
     async def _run_with_progress():
-        from nerfprobe.runner import DEFAULT_CONFIGS, run_probe
         from nerfprobe_core import ModelTarget, ProbeResult
+
+        from nerfprobe.runner import run_probe
 
         # Initialize Gateway inside the loop
         gateway = get_gateway(provider, api_key, base_url)
@@ -103,13 +107,13 @@ def run(
                 probe_names = list(probe)
             else:
                 probe_names = get_probes_for_tier(tier)
-            
+
             # Filter available
             probe_names = [p for p in probe_names if p in PROBE_REGISTRY]
             total_probes = len(probe_names)
-            
+
             results = []
-            
+
             # UI: Progress Bar
             with Progress(
                 SpinnerColumn(),
@@ -118,10 +122,10 @@ def run(
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                 TimeElapsedColumn(),
                 console=console,
-                transient=True, # Disappear when done
+                transient=True,  # Disappear when done
             ) as progress:
                 task_id = progress.add_task(f"Running {tier} probes...", total=total_probes)
-                
+
                 for name in probe_names:
                     progress.update(task_id, description=f"Probing [cyan]{name}[/cyan]...")
                     try:
@@ -131,20 +135,23 @@ def run(
                     except Exception as e:
                         # Handle error cleanly without crashing UI
                         from nerfprobe_core import ProbeType
+
                         target = ModelTarget(provider_id=provider, model_name=model)
-                        results.append(ProbeResult(
-                            probe_name=name,
-                            probe_type=ProbeType.MATH,
-                            target=target,
-                            passed=False,
-                            score=0.0,
-                            latency_ms=0.0,
-                            raw_response=f"Error: {e}",
-                            metadata={}
-                        ))
-                    
+                        results.append(
+                            ProbeResult(
+                                probe_name=name,
+                                probe_type=ProbeType.MATH,
+                                target=target,
+                                passed=False,
+                                score=0.0,
+                                latency_ms=0.0,
+                                raw_response=f"Error: {e}",
+                                metadata={},
+                            )
+                        )
+
                     progress.advance(task_id)
-                    
+
             return results
         finally:
             await gateway.close()
@@ -177,7 +184,7 @@ def run(
 
         for r in results:
             result_store.append(r)
-            
+
             # Drift Logic
             baseline = baseline_store.get_baseline_score(model, r.probe_name)
             detail_str = ""
@@ -185,7 +192,7 @@ def run(
                 drop = ((baseline - r.score) / baseline) * 100
                 detail_str = f"📉 -{drop:.1f}%"
                 drifts.append(r)
-            
+
             # Failure Reason overrides drift in Detail column
             if r.error_reason:
                 detail_str = r.error_reason
@@ -201,29 +208,31 @@ def run(
                 f"{r.latency_ms:.0f}ms",
                 str(r.input_tokens if r.input_tokens is not None else "-"),
                 str(r.output_tokens if r.output_tokens is not None else "-"),
-                detail_str or "-"
+                detail_str or "-",
             )
 
         # Summary Panel
         passed = sum(1 for r in results if r.passed)
         total = len(results)
-        
+
         summary_text = f"Probes: {passed}/{total} Passing"
         if drifts:
             summary_text += f"\n[yellow]Performance Drift Detected in {len(drifts)} probes[/yellow]"
-        
+
         summary_text += "\n[dim]Results saved to local storage[/dim]"
 
         # Layout
         console.print()
-        console.print(Panel(
-            table,
-            title=f"[bold]NerfProbe Analysis: {model}[/bold]",
-            subtitle=summary_text,
-            border_style="blue",
-            box=box.ROUNDED,
-            padding=(1, 2)
-        ))
+        console.print(
+            Panel(
+                table,
+                title=f"[bold]NerfProbe Analysis: {model}[/bold]",
+                subtitle=summary_text,
+                border_style="blue",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
 
 
 @baseline_app.command("set")
@@ -232,22 +241,22 @@ def baseline_set(
     tier: str = typer.Option("core", "--tier", "-t", help="Probe tier"),
     runs: int = typer.Option(3, "--runs", "-n", help="Number of runs to average"),
     provider: str = typer.Option("openai", "--provider", help="Provider"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", "-k"),
+    api_key: str | None = typer.Option(None, "--api-key", "-k"),
 ):
     """Run probes multiple times to establish a baseline."""
     gateway = get_gateway(provider, api_key, None)
     store = BaselineStore()
-    
+
     console.print(f"Establishing baseline for [cyan]{model}[/cyan] ({runs} runs)...")
-    
+
     async def _collect():
         all_results = []
         for i in range(runs):
-            console.print(f"  Run {i+1}/{runs}...")
+            console.print(f"  Run {i + 1}/{runs}...")
             r = await run_probes(model, gateway, tier=tier, provider_id=provider)
             all_results.extend(r)
         return all_results
-    
+
     try:
         results = asyncio.run(_collect())
         store.save_baseline(model, results)
@@ -257,7 +266,7 @@ def baseline_set(
 
 
 @baseline_app.command("show")
-def baseline_show(model: Optional[str] = typer.Argument(None)):
+def baseline_show(model: str | None = typer.Argument(None)):
     """Show stored baselines."""
     store = BaselineStore()
     if model:
@@ -273,15 +282,17 @@ def baseline_show(model: Optional[str] = typer.Argument(None)):
         # Let's add get_all to store later. For now require model or fail.
         # Check storage file content
         from pathlib import Path
+
         from platformdirs import user_data_dir
+
         path = Path(user_data_dir("nerfprobe", "nerfstatus")) / "baselines.json"
         if not path.exists():
             console.print("No baselines recorded.")
             return
-        
+
         with open(path) as f:
             all_data = json.load(f)
-        
+
         for m, data in all_data.items():
             _print_baseline(m, data)
 
@@ -292,14 +303,9 @@ def _print_baseline(model: str, data: dict):
     table.add_column("Avg Score")
     table.add_column("Samples")
     table.add_column("Last Updated")
-    
+
     for probe, info in data.items():
-        table.add_row(
-            probe,
-            f"{info['score']:.2f}",
-            str(info['samples']),
-            info['last_updated']
-        )
+        table.add_row(probe, f"{info['score']:.2f}", str(info["samples"]), info["last_updated"])
     console.print(table)
 
 
@@ -312,21 +318,21 @@ def schedule_add(
     """Schedule automated runs via cron."""
     # Build command
     python_path = os.sys.executable
-    cmd = f"{python_path} -m nerfprobe run {model} --tier {tier} --provider openai" # Defaults
-    
+    cmd = f"{python_path} -m nerfprobe run {model} --tier {tier} --provider openai"  # Defaults
+
     cron = CronTab(user=True)
     job = cron.new(command=cmd, comment=f"nerfprobe-{model}")
-    
+
     if frequency == "daily":
-        job.setall("0 9 * * *") # 9 AM
+        job.setall("0 9 * * *")  # 9 AM
     elif frequency == "weekly":
-        job.setall("0 9 * * 1") # Monday 9 AM
+        job.setall("0 9 * * 1")  # Monday 9 AM
     elif frequency == "hourly":
         job.setall("0 * * * *")
     else:
         console.print("[red]Unknown frequency[/red]")
         return
-        
+
     job.enable()
     cron.write()
     console.print(f"[green]✓[/green] Scheduled {model} ({frequency})")
@@ -340,11 +346,11 @@ def schedule_list():
     table.add_column("Model/Comment")
     table.add_column("Schedule")
     table.add_column("Command")
-    
+
     for job in cron:
         if job.comment.startswith("nerfprobe"):
             table.add_row(job.comment, str(job.slices), job.command)
-            
+
     console.print(table)
 
 
@@ -352,6 +358,7 @@ def schedule_list():
 def tui():
     """Launch terminal dashboard."""
     from nerfprobe.tui.app import NerfProbeApp
+
     app = NerfProbeApp()
     app.run()
 
@@ -360,7 +367,7 @@ def tui():
 def config_info():
     """Show configuration and API key status."""
     console.print("[bold]Configuration Status[/bold]")
-    
+
     # Check common keys
     keys = [
         "OPENAI_API_KEY",
@@ -370,20 +377,20 @@ def config_info():
         "GROQ_API_KEY",
         "OLLAMA_BASE_URL",
     ]
-    
+
     table = Table(title="Environment Variables")
     table.add_column("Variable", style="cyan")
     table.add_column("Status", style="green")
     table.add_column("Current Value (Masked)")
-    
+
     for key in keys:
         val = os.getenv(key)
         status = "[green]Set[/green]" if val else "[red]Missing[/red]"
         masked = f"{val[:4]}...{val[-4:]}" if val and len(val) > 8 else "—"
         table.add_row(key, status, masked)
-        
+
     console.print(table)
-    
+
     console.print("\n[bold]Usage Guide:[/bold]")
     console.print("1. create a `.env` file in your current directory or `~/.nerfprobe/.env`.")
     console.print("2. Add your keys:")
@@ -396,7 +403,6 @@ def config_info():
     console.print("   OPENAI_API_KEY=gsk_... (or pass --api-key)")
     console.print("   OPENAI_BASE_URL=https://api.groq.com/openai/v1")
     console.print("   nerfprobe run llama3-70b-8192 --provider openai --base-url https://api.groq.com/openai/v1")
-
 
 
 @app.command()
@@ -446,7 +452,7 @@ def list_probes():
 def list_models():
     """List known models in registry."""
     from nerfprobe_core.models import MODELS
-    
+
     table = Table(title="Known Models")
     table.add_column("Model ID", style="cyan")
     table.add_column("Provider", style="yellow")
@@ -466,34 +472,44 @@ def list_models():
 def research(
     model: str = typer.Argument(..., help="Model name to research"),
     provider: str = typer.Option("unknown", "--provider", "-p", help="Provider name"),
-    parse: Optional[str] = typer.Option(None, "--parse", help="Parse JSON response from LLM"),
+    parse: str | None = typer.Option(None, "--parse", help="Parse JSON response from LLM"),
 ):
     """Generate research prompt for unknown models."""
     from nerfprobe_core.models import get_model_info
     from nerfprobe_core.models.research import get_research_prompt, parse_research_response
-    
+
     # Check if already known
     info = get_model_info(model)
     if info and not parse:
         console.print(f"[green]✓[/green] Model '{model}' already in registry:")
         console.print(f"  Provider: {info.provider}")
-        console.print(f"  Context Window: {info.context_window:,}" if info.context_window else "  Context Window: unknown")
-        console.print(f"  Knowledge Cutoff: {info.knowledge_cutoff}" if info.knowledge_cutoff else "  Knowledge Cutoff: unknown")
+        console.print(
+            f"  Context Window: {info.context_window:,}" if info.context_window else "  Context Window: unknown"
+        )
+        console.print(
+            f"  Knowledge Cutoff: {info.knowledge_cutoff}" if info.knowledge_cutoff else "  Knowledge Cutoff: unknown"
+        )
         return
-    
+
     if parse:
         # Parse provided JSON response
         result = parse_research_response(model, provider, parse)
         if result:
-            console.print(f"[green]✓[/green] Parsed successfully:")
+            console.print("[green]✓[/green] Parsed successfully:")
             console.print(f"  ID: {result.id}")
             console.print(f"  Provider: {result.provider}")
-            console.print(f"  Context Window: {result.context_window:,}" if result.context_window else "  Context Window: unknown")
-            console.print(f"  Knowledge Cutoff: {result.knowledge_cutoff}" if result.knowledge_cutoff else "  Knowledge Cutoff: unknown")
+            console.print(
+                f"  Context Window: {result.context_window:,}" if result.context_window else "  Context Window: unknown"
+            )
+            console.print(
+                f"  Knowledge Cutoff: {result.knowledge_cutoff}"
+                if result.knowledge_cutoff
+                else "  Knowledge Cutoff: unknown"
+            )
         else:
             console.print("[red]✗[/red] Failed to parse JSON response")
         return
-    
+
     # Generate research prompt
     prompt = get_research_prompt(model, provider)
     console.print("[bold]Research Prompt[/bold] (paste into any LLM):\n")
@@ -507,6 +523,7 @@ def research(
 def version():
     """Show version."""
     from nerfprobe import __version__
+
     console.print(f"nerfprobe {__version__}")
 
 

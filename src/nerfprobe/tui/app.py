@@ -2,24 +2,22 @@
 
 import json
 from datetime import datetime
-from typing import List
 
 from crontab import CronTab
 from rich.text import Text
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Container
 from textual.widgets import (
     Button,
     DataTable,
     Footer,
     Header,
     Label,
-    Static,
     TabbedContent,
     TabPane,
 )
 
-from nerfprobe.storage import ResultStore, BaselineStore
+from nerfprobe.storage import BaselineStore, ResultStore
 
 
 class Dashboard(Container):
@@ -38,7 +36,7 @@ class Dashboard(Container):
         store = ResultStore()
         table = self.query_one("#recent_runs_table", DataTable)
         table.clear()
-        
+
         recent = store.get_recent(limit=50)
         for r in recent:
             # Parse time
@@ -57,7 +55,7 @@ class Dashboard(Container):
             latency = r.get("latency_ms", 0.0)
 
             status = Text("PASS", style="green") if passed else Text("FAIL", style="red")
-            
+
             table.add_row(
                 time_str,
                 model,
@@ -89,13 +87,13 @@ class BaselineView(Container):
         store = BaselineStore()
         table = self.query_one("#baselines_table", DataTable)
         table.clear()
-        
+
         # We need a way to look into the file structure roughly since get_all is not standard
         # But we can access the file directly or add functionality.
         # Let's rely on _load private method or similar logic for now
         # Actually storage.py's get_model_baselines returns dict for one model.
         # But we want ALL. Let's just read the file here as we are in the app
-        
+
         path = store.baseline_file
         if not path.exists():
             return
@@ -103,15 +101,15 @@ class BaselineView(Container):
         try:
             with open(path) as f:
                 data = json.load(f)
-                
+
             for model, probes in data.items():
                 for probe, info in probes.items():
                     table.add_row(
                         model,
                         probe,
                         f"{info.get('score', 0):.2f}",
-                        str(info.get('samples', 0)),
-                        info.get('last_updated', '')
+                        str(info.get("samples", 0)),
+                        info.get("last_updated", ""),
                     )
         except Exception:
             pass
@@ -129,7 +127,7 @@ class ScheduleView(Container):
         table = self.query_one("#schedule_table", DataTable)
         table.add_columns("Job/Comment", "Schedule", "Command")
         self.load_data()
-        
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "refresh_schedule":
             self.load_data()
@@ -139,14 +137,10 @@ class ScheduleView(Container):
             cron = CronTab(user=True)
             table = self.query_one("#schedule_table", DataTable)
             table.clear()
-            
+
             for job in cron:
                 if job.comment.startswith("nerfprobe"):
-                    table.add_row(
-                        job.comment,
-                        str(job.slices),
-                        job.command
-                    )
+                    table.add_row(job.comment, str(job.slices), job.command)
         except Exception:
             pass
 

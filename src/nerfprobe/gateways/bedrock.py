@@ -1,10 +1,10 @@
 """AWS Bedrock gateway for Claude and other models."""
 
-from typing import AsyncIterator
 import json
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult
+import httpx
+from nerfprobe_core import LogprobResult, ModelTarget
 
 
 class BedrockGateway:
@@ -33,6 +33,7 @@ class BedrockGateway:
             import boto3
             from botocore.auth import SigV4Auth
             from botocore.awsrequest import AWSRequest
+
             self._boto_available = True
         except ImportError:
             self._boto_available = False
@@ -51,7 +52,6 @@ class BedrockGateway:
         if not self._boto_available:
             raise ImportError("boto3 required for Bedrock gateway. pip install boto3")
 
-        import boto3
         from botocore.auth import SigV4Auth
         from botocore.awsrequest import AWSRequest
         from botocore.credentials import Credentials
@@ -104,9 +104,7 @@ class BedrockGateway:
         else:
             return data.get("results", [{}])[0].get("outputText", "")
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming not fully implemented for Bedrock."""
         # Bedrock streaming is complex, return non-streaming for now
         result = await self.generate(model, prompt)

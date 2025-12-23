@@ -3,11 +3,11 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
-from nerfprobe.storage import ResultStore, BaselineStore
-from nerfprobe_core import ProbeResult, ModelTarget, ProbeType
+from nerfprobe_core import ModelTarget, ProbeResult, ProbeType
+
+from nerfprobe.storage import BaselineStore, ResultStore
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ class TestResultStore:
     def test_append_creates_file(self, temp_data_dir, mock_result):
         store = ResultStore(path=temp_data_dir)
         store.append(mock_result)
-        
+
         assert (temp_data_dir / "results.jsonl").exists()
         with open(temp_data_dir / "results.jsonl") as f:
             lines = f.readlines()
@@ -48,7 +48,7 @@ class TestResultStore:
         for i in range(10):
             mock_result.score = float(i)
             store.append(mock_result)
-            
+
         recent = store.get_recent(limit=5)
         assert len(recent) == 5
         # Should be most recent first (last in file is most recent)
@@ -58,7 +58,7 @@ class TestResultStore:
     def test_get_trends(self, temp_data_dir, mock_result):
         store = ResultStore(path=temp_data_dir)
         store.append(mock_result)
-        
+
         trends = store.get_trends(model="gpt-4o")
         assert "math_probe" in trends
         assert len(trends["math_probe"]) == 1
@@ -68,23 +68,23 @@ class TestResultStore:
 class TestBaselineStore:
     def test_save_and_get_baseline(self, temp_data_dir, mock_result):
         store = BaselineStore(path=temp_data_dir)
-        
-        results = [mock_result, mock_result] # 1.0, 1.0
+
+        results = [mock_result, mock_result]  # 1.0, 1.0
         store.save_baseline("gpt-4o", results)
-        
+
         score = store.get_baseline_score("gpt-4o", "math_probe")
         assert score == 1.0
-        
+
         baselines = store.get_model_baselines("gpt-4o")
         assert "math_probe" in baselines
         assert baselines["math_probe"]["samples"] == 2
 
     def test_updates_existing_baseline(self, temp_data_dir, mock_result):
         store = BaselineStore(path=temp_data_dir)
-        
+
         store.save_baseline("gpt-4o", [mock_result])
         assert store.get_baseline_score("gpt-4o", "math_probe") == 1.0
-        
+
         # New baseline with lower score
         mock_result.score = 0.5
         store.save_baseline("gpt-4o", [mock_result])

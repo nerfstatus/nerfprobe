@@ -1,9 +1,9 @@
 """OpenAI-compatible gateway for OpenAI, OpenRouter, vLLM, Ollama, etc."""
 
-from typing import AsyncIterator
-import httpx
+from collections.abc import AsyncIterator
 
-from nerfprobe_core import ModelTarget, LogprobResult, LogprobToken, StrWithUsage
+import httpx
+from nerfprobe_core import LogprobResult, LogprobToken, ModelTarget, StrWithUsage
 
 
 class OpenAIGateway:
@@ -52,9 +52,7 @@ class OpenAIGateway:
         usage = data.get("usage", {})
         return StrWithUsage(content, usage)
 
-    async def generate_stream(
-        self, model: ModelTarget, prompt: str
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, model: ModelTarget, prompt: str) -> AsyncIterator[str]:
         """Streaming completion for timing analysis."""
         client = await self._get_client()
         async with client.stream(
@@ -74,6 +72,7 @@ class OpenAIGateway:
                         break
                     try:
                         import json
+
                         data = json.loads(data_str)
                         delta = data["choices"][0].get("delta", {})
                         content = delta.get("content", "")
@@ -119,12 +118,12 @@ class OpenAIGateway:
             )
 
         usage = data.get("usage", {})
-        
+
         return LogprobResult(
-            text=text, 
+            text=text,
             tokens=tokens,
             input_tokens=usage.get("prompt_tokens"),
-            output_tokens=usage.get("completion_tokens")
+            output_tokens=usage.get("completion_tokens"),
         )
 
     async def close(self) -> None:

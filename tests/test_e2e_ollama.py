@@ -1,17 +1,18 @@
 """End-to-end tests with Ollama (requires local Ollama server)."""
 
-import pytest
 import os
+
+import pytest
 
 # Skip all tests if Ollama is not available
 pytestmark = pytest.mark.skipif(
-    os.environ.get("SKIP_E2E", "1") == "1",
-    reason="E2E tests disabled. Set SKIP_E2E=0 to run."
+    os.environ.get("SKIP_E2E", "1") == "1", reason="E2E tests disabled. Set SKIP_E2E=0 to run."
 )
+
+from nerfprobe_core import ModelTarget
 
 from nerfprobe.gateways import OllamaGateway
 from nerfprobe.runner import run_probes
-from nerfprobe_core import ModelTarget
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ class TestOllamaE2E:
         tokens = []
         async for token in ollama_gateway.generate_stream(target, "Count from 1 to 5"):
             tokens.append(token)
-        
+
         full_response = "".join(tokens)
         assert len(full_response) > 0
 
@@ -59,7 +60,7 @@ class TestOllamaE2E:
             probes=["math"],
             provider_id="ollama",
         )
-        
+
         assert len(results) == 1
         result = results[0]
         print(f"Math probe: passed={result.passed}, score={result.score}")
@@ -74,7 +75,7 @@ class TestOllamaE2E:
             probes=["style"],
             provider_id="ollama",
         )
-        
+
         assert len(results) == 1
         result = results[0]
         print(f"Style probe: passed={result.passed}, score={result.score}")
@@ -89,7 +90,7 @@ class TestOllamaE2E:
             probes=["code"],
             provider_id="ollama",
         )
-        
+
         assert len(results) == 1
         result = results[0]
         print(f"Code probe: passed={result.passed}, score={result.score}")
@@ -103,16 +104,18 @@ class TestOllamaE2E:
             tier="core",
             provider_id="ollama",
         )
-        
+
         assert len(results) == 4
         for result in results:
-            print(f"{result.probe_name}: passed={result.passed}, score={result.score:.2f}, latency={result.latency_ms:.0f}ms")
+            print(
+                f"{result.probe_name}: passed={result.passed}, score={result.score:.2f}, latency={result.latency_ms:.0f}ms"
+            )
 
     @pytest.mark.asyncio
     async def test_compare_models(self, ollama_gateway):
         """Compare two models on same probe."""
         models = ["gemma2:2b", "qwen3:4b"]
-        
+
         for model_name in models:
             results = await run_probes(
                 model_name=model_name,
