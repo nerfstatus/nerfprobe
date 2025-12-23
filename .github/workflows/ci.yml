@@ -34,7 +34,7 @@ jobs:
         run: |
           uv pip install --system -e ./nerfprobe-core
           uv pip install --system -e . --no-deps
-          uv pip install --system httpx typer rich textual python-crontab platformdirs jsonschema python-dotenv pytest pytest-asyncio ruff mypy respx
+          uv pip install --system httpx typer rich textual python-crontab platformdirs jsonschema python-dotenv pytest pytest-asyncio pytest-cov ruff mypy respx
 
       - name: Lint with Ruff
         run: ruff check src/ tests/
