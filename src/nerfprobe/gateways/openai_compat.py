@@ -3,7 +3,7 @@
 from typing import AsyncIterator
 import httpx
 
-from nerfprobe_core import ModelTarget, LogprobResult, LogprobToken
+from nerfprobe_core import ModelTarget, LogprobResult, LogprobToken, StrWithUsage
 
 
 class OpenAIGateway:
@@ -48,7 +48,9 @@ class OpenAIGateway:
         )
         response.raise_for_status()
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        content = data["choices"][0]["message"]["content"]
+        usage = data.get("usage", {})
+        return StrWithUsage(content, usage)
 
     async def generate_stream(
         self, model: ModelTarget, prompt: str
@@ -116,7 +118,14 @@ class OpenAIGateway:
                 )
             )
 
-        return LogprobResult(text=text, tokens=tokens)
+        usage = data.get("usage", {})
+        
+        return LogprobResult(
+            text=text, 
+            tokens=tokens,
+            input_tokens=usage.get("prompt_tokens"),
+            output_tokens=usage.get("completion_tokens")
+        )
 
     async def close(self) -> None:
         """Close the HTTP client."""
