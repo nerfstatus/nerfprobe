@@ -28,18 +28,18 @@ class TestGetProbesForTier:
         assert "style" in probes
         assert "timing" in probes
         assert "code" in probes
-        assert len(probes) == 4
+        assert len(probes) == 5  # math, style, timing, code, fact
 
     def test_advanced_tier(self):
         probes = get_probes_for_tier("advanced")
         assert "math" in probes  # Includes core
         assert "fingerprint" in probes
         assert "context" in probes
-        assert len(probes) == 11  # 4 core + 7 advanced
+        assert len(probes) == 14  # 5 core + 9 advanced
 
     def test_all_tier(self):
         probes = get_probes_for_tier("all")
-        assert len(probes) == 14
+        assert len(probes) == 17  # 5 core + 9 advanced + 3 optional
 
     def test_invalid_tier(self):
         with pytest.raises(ValueError):
@@ -48,7 +48,7 @@ class TestGetProbesForTier:
 
 class TestDefaultConfigs:
     def test_all_core_probes_have_configs(self):
-        for probe_name in ["math", "style", "timing", "code"]:
+        for probe_name in ["math", "style", "timing", "code", "fact"]:
             assert probe_name in DEFAULT_CONFIGS
 
     def test_all_advanced_probes_have_configs(self):
@@ -90,7 +90,7 @@ class TestRunProbes:
             tier="core",
         )
 
-        assert len(results) == 4
+        assert len(results) == 5  # 5 core probes
         probe_names = [r.probe_name for r in results]
         assert "math_probe" in probe_names
 

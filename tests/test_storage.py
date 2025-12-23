@@ -45,9 +45,18 @@ class TestResultStore:
 
     def test_get_recent(self, temp_data_dir, mock_result):
         store = ResultStore(path=temp_data_dir)
+        target = ModelTarget(provider_id="openai", model_name="gpt-4o")
         for i in range(10):
-            mock_result.score = float(i)
-            store.append(mock_result)
+            result = ProbeResult(
+                probe_name="math_probe",
+                probe_type=ProbeType.MATH,
+                target=target,
+                passed=True,
+                score=float(i),
+                latency_ms=100.0,
+                raw_response="Answer",
+            )
+            store.append(result)
 
         recent = store.get_recent(limit=5)
         assert len(recent) == 5
@@ -81,11 +90,20 @@ class TestBaselineStore:
 
     def test_updates_existing_baseline(self, temp_data_dir, mock_result):
         store = BaselineStore(path=temp_data_dir)
+        target = ModelTarget(provider_id="openai", model_name="gpt-4o")
 
         store.save_baseline("gpt-4o", [mock_result])
         assert store.get_baseline_score("gpt-4o", "math_probe") == 1.0
 
-        # New baseline with lower score
-        mock_result.score = 0.5
-        store.save_baseline("gpt-4o", [mock_result])
+        # New baseline with lower score - create new instance
+        low_score_result = ProbeResult(
+            probe_name="math_probe",
+            probe_type=ProbeType.MATH,
+            target=target,
+            passed=True,
+            score=0.5,
+            latency_ms=100.0,
+            raw_response="Answer",
+        )
+        store.save_baseline("gpt-4o", [low_score_result])
         assert store.get_baseline_score("gpt-4o", "math_probe") == 0.5
