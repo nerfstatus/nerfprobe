@@ -16,6 +16,7 @@ from nerfprobe_core.probes.config import (
     CodeProbeConfig,
     ConstraintProbeConfig,
     ContextProbeConfig,
+    FactProbeConfig,
     FingerprintProbeConfig,
     LogicPuzzleProbeConfig,
     MathProbeConfig,
@@ -45,6 +46,11 @@ DEFAULT_CONFIGS = {
     ),
     "code": CodeProbeConfig(
         name="code_probe",
+    ),
+    "fact": FactProbeConfig(
+        name="fact_probe",
+        prompt="What year did the Titanic sink?",
+        expected_text="1912",
     ),
     # Advanced tier
     "fingerprint": FingerprintProbeConfig(),

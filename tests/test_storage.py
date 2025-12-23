@@ -52,7 +52,7 @@ class TestResultStore:
                 probe_type=ProbeType.MATH,
                 target=target,
                 passed=True,
-                score=float(i),
+                score=i / 10.0,  # Scores must be 0.0-1.0
                 latency_ms=100.0,
                 raw_response="Answer",
             )
@@ -61,8 +61,8 @@ class TestResultStore:
         recent = store.get_recent(limit=5)
         assert len(recent) == 5
         # Should be most recent first (last in file is most recent)
-        assert recent[0]["score"] == 9.0
-        assert recent[4]["score"] == 5.0
+        assert recent[0]["score"] == 0.9
+        assert recent[4]["score"] == 0.5
 
     def test_get_trends(self, temp_data_dir, mock_result):
         store = ResultStore(path=temp_data_dir)
