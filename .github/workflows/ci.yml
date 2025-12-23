@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: nerfstatus/nerfprobe-core
+          path: nerfprobe-core
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e nerfprobe-core
+          uv pip install --system -e ".[dev]"
+
+      - name: Lint with Ruff
+        run: ruff check src/ tests/
+
+      - name: Test with Pytest
+        run: pytest tests/ -v --cov=src/nerfprobe --cov-report=xml --ignore=tests/test_e2e_ollama.py
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
